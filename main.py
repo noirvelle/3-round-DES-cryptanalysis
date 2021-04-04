@@ -131,6 +131,7 @@ class des():
         self.password = None
         self.text = None
         self.keys = list()
+        self.data = {}
         
     def run(self, key, text, action=ENCRYPT, padding=False):
         if len(key) < 8:
@@ -156,15 +157,20 @@ class des():
             tmp = None
             for i in range(3): #Do the 16 rounds
                 right_e = self.expand(right, E) #Expand d to match Ki size (48bits)
+                self.data[f"E{i}"] = right_e
                 if action == ENCRYPT:
-                    tmp = self.xor(self.keys[i], right_e)#If encrypt use Ki
+                    tmp = self.xor(self.keys[i], right_e)   # If encrypt use Ki
                 else:
-                    tmp = self.xor(self.keys[2-i], right_e)#If decrypt start by the last key
-                tmp = self.substitute(tmp) #Method that will apply the SBOXes
-                tmp = self.permut(tmp, P)
-                tmp = self.xor(left, tmp)
+                    tmp = self.xor(self.keys[2-i], right_e) # If decrypt start by the last key
+                tmp = self.substitute(tmp)                  # Method that will apply the SBOXes
+                self.data[f"S{i}"] = tmp
+                tmp = self.permut(tmp, P)                   # final of F-BOX -> F(Rn-1, Kn)
+                self.data[f"F{i}"] = tmp
+                tmp = self.xor(left, tmp)                   # Ln-1 XOR F(Rn-1, Kn)
                 left = right
                 right = tmp
+                self.data[f"R{i+1}"] = tmp
+                self.data[f"L{i+1}"] = left
             result += self.permut(right+left, PI_1) #Do the last permut and append the result to result
         final_res = bit_array_to_string(result)
         if padding and action==DECRYPT:
@@ -186,6 +192,13 @@ class des():
         
     def permut(self, block, table):#Permut the given block using the given table (so generic method)
         return [block[x-1] for x in table]
+
+    def inverse_permut(self, block, table):
+        inverse_table = { k:v-1 for k,v in enumerate(table) }
+        inversed = [0] * len(block)
+        for k,v in inverse_table.items():
+            inversed[v] = block[k]
+        return inversed
     
     def expand(self, block, table):#Do the exact same thing than permut but for more clarity has been renamed
         return [block[x-1] for x in table]
@@ -221,97 +234,117 @@ class des():
         return self.run(key, text, DECRYPT, padding)
     
 if __name__ == '__main__':
-    d = des()
+    d1 = des()
+    d2 = des()
 
     p1 = "PAPAMAMA"
     p2 = "MIMIMAMA"
     key = "secret_k"
 
-    c1 = d.encrypt(key, p1)
-    c2 = d.encrypt(key, p2)
+    c1 = d1.encrypt(key, p1)
+    c2 = d2.encrypt(key, p2)
 
-    print(f"p1: {p1}, c1: {c1}")
-    print(f"p2: {p2}, c2: {c2}")
-    print()
-    print()
+    print("P1")
+    for k,v in d1.data.items():
+        print(k,v)
 
-    data1 = dict()
-    data2 = dict()
-    diff = dict()
-
-    data1['L0'] = p1[:4]; data1['R0'] = p1[4:]
-    data2['L0'] = p2[:4]; data2['R0'] = p2[4:]
-
-    data1['L3'] = c1[:4]; data1['R3'] = c1[4:]
-    data2['L3'] = c2[:4]; data2['R3'] = c2[4:]
-
-    data1['L1'] = data1['R0']
-    data2['L1'] = data2['R0']
-
-    data1['R2'] = data1['L3']
-    data2['R2'] = data2['L3']
-
-    data1["L0x"] = string_to_hex_bit_array(data1["L0"]); data1["R0x"] = string_to_hex_bit_array(data1["R0"])
-    data2["L0x"] = string_to_hex_bit_array(data2["L0"]); data2["R0x"] = string_to_hex_bit_array(data2["R0"])
-
-    data1["L3x"] = string_to_hex_bit_array(data1["L3"]); data1["R3x"] = string_to_hex_bit_array(data1["R3"])
-    data2["L3x"] = string_to_hex_bit_array(data2["L3"]); data2["R3x"] = string_to_hex_bit_array(data2["R3"])
-
-    data1["L1x"] = data1["R0x"]
-    data2["L1x"] = data2["R0x"]
-
-    data1["R2x"] = data1["L3x"]
-    data2["R2x"] = data2["L3x"]
-
-    # L2+L2' = R1+R1' = (L0+f(R0))+(L0'+f(R0')) = L0+L0'
-    diff["L2"] = diff["R1"] = diff["L0"] = xor_bits_array(string_to_bit_array(data1["L0"]), string_to_bit_array(data2["L0"]))
-
-    # R2+R2'= L3+L3'.
-    diff["R2"] = diff["L3"] = xor_bits_array(string_to_bit_array(data1["L3"]), string_to_bit_array(data2["L3"]))
-
-    # diff output right
-    diff["R3"] = xor_bits_array(string_to_bit_array(data1["L3"]), string_to_bit_array(data2["R3"]))
-
-    # If we knew L2, the output to the last F-Box would be known, as R3+L2, we could begin forcing open Key3. 
-    # -> Fk3(R2, L2) + L2 = R3
-    # -> Fk3(R2, L2) = R3 + L2
-
-    # F box Input: R2, L2, Key-3
-    # F box Output: R3
-
-    # Given the differential input and output to an S-Box (by tracing the input and outputs to the F-Box through the E and P functions inside the F-Box, 
-    # here again we use the xor jumping property of differentials), 
-    # we get a list a possible input pairs: input pairs X and X' such that X+X' equals the differential input 
-    # and f(X) + f(X') equals the differential output. 
-    # We then compute keys which transform X and X' into R2 and R2'. 
-
-    # diff output of F box:
-    # - R3 = L2 + F(R2, Key3)
-    # - F(R2, Key3) = R3 + L2
-    diff["F-Box-output"] = xor_bits_array(diff["R3"], diff["L2"]) 
-
-    # diff koutput of S Box:
-    # - F(R2, Key3) = permute(S(E(R2) + K3))
-
-    # diff output of E Box:
-    diff["E-Box-output"] = d.permut(diff["R2"] , E)
+    print("P2")
+    for k,v in d2.data.items():
+        print(k,v)
 
 
-    print(f"differentials {p1} {p2}")
-    for k,v in diff.items():
-        print(k, "\t", v)
+    # R3 = L0 + f(R0,K1) + f(R2,K3)
+    # R3' = ( L0 + f(R0,K1) + f(R2,K3) ) + ( L0* + f(R0*,K1) + f(R2*,K3) )
+    # because R0 = R0* -> f(R0,K1) +  (R0*,K1) = 0
+    # R3' = L0' + f(R2,K3) + f(R2*,K3)  = C'
 
-    print()
 
-    print(f"plaintext {p1}")
-    for k,v in data1.items():
-        print(k, "\t", v)
 
-    print()
+    # print(f"p1: {p1}, c1: {c1}")
+    # print(f"p2: {p2}, c2: {c2}")
+    # print()
+    # print()
 
-    print(f"plaintext {p2}")
-    for k,v in data2.items():
-        print(k, "\t", v)
+    # data1 = dict()
+    # data2 = dict()
+    # diff = dict()
+
+    # data1['L0'] = p1[:4]; data1['R0'] = p1[4:]
+    # data2['L0'] = p2[:4]; data2['R0'] = p2[4:]
+
+    # data1['L3'] = c1[:4]; data1['R3'] = c1[4:]
+    # data2['L3'] = c2[:4]; data2['R3'] = c2[4:]
+
+    # data1['L1'] = data1['R0']
+    # data2['L1'] = data2['R0']
+
+    # data1['R2'] = data1['L3']
+    # data2['R2'] = data2['L3']
+
+    # data1["L0x"] = string_to_hex_bit_array(data1["L0"]); data1["R0x"] = string_to_hex_bit_array(data1["R0"])
+    # data2["L0x"] = string_to_hex_bit_array(data2["L0"]); data2["R0x"] = string_to_hex_bit_array(data2["R0"])
+
+    # data1["L3x"] = string_to_hex_bit_array(data1["L3"]); data1["R3x"] = string_to_hex_bit_array(data1["R3"])
+    # data2["L3x"] = string_to_hex_bit_array(data2["L3"]); data2["R3x"] = string_to_hex_bit_array(data2["R3"])
+
+    # data1["L1x"] = data1["R0x"]
+    # data2["L1x"] = data2["R0x"]
+
+    # data1["R2x"] = data1["L3x"]
+    # data2["R2x"] = data2["L3x"]
+
+    # # L2+L2' = R1+R1' = (L0+f(R0))+(L0'+f(R0')) = L0+L0'
+    # diff["L2"] = diff["R1"] = diff["L0"] = xor_bits_array(string_to_bit_array(data1["L0"]), string_to_bit_array(data2["L0"]))
+
+    # # R2+R2'= L3+L3'.
+    # diff["R2"] = diff["L3"] = xor_bits_array(string_to_bit_array(data1["L3"]), string_to_bit_array(data2["L3"]))
+
+    # # diff output right
+
+    # # If we knew L2, the output to the last F-Box would be known, as R3+L2, we could begin forcing open Key3. 
+    # # -> Fk3(R2, L2) + L2 = R3
+    # # -> Fk3(R2, L2) = R3 + L2
+
+    # # F box Input: R2, L2, Key-3
+    # # F box Output: R3
+
+    # # Given the differential input and output to an S-Box (by tracing the input and outputs to the F-Box through the E and P functions inside the F-Box, 
+    # # here again we use the xor jumping property of differentials), 
+    # # we get a list a possible input pairs: input pairs X and X' such that X+X' equals the differential input 
+    # # and f(X) + f(X') equals the differential output. 
+    # # We then compute keys which transform X and X' into R2 and R2'. 
+
+    # # diff output of F box:
+    # # - R3 = L2 + F(R2, Key3)
+    # # - F(R2, Key3) = R3 + L2
+
+    # # R3            = F(R2, K3) + L2                        -> 3th Round Output or R3
+    # # F(R2, K3)     = permute(S(E(R2) + K3), P)             -> F BOX Output
+    # # S(E(R2) + K3) = inverse_permute(F(R2, K3), P)         -> S Box Output
+    # # E(R2) + K3                                            -> S Box input
+
+
+    # # diff["R3"] = xor_bits_array(string_to_bit_array(data1["R3"]), string_to_bit_array(data2["R3"]))
+    # # diff["F-Box-output"] = xor_bits_array(diff["R3"], diff["L2"]) 
+    # # diff["S-Box-output"] = d.inverse_permut(diff["F-Box-output"], P)
+
+
+
+    # print(f"differentials {p1} {p2}")
+    # for k,v in diff.items():
+    #     print(k, "\t", v)
+
+    # print()
+
+    # print(f"plaintext {p1}")
+    # for k,v in data1.items():
+    #     print(k, "\t", v)
+
+    # print()
+
+    # print(f"plaintext {p2}")
+    # for k,v in data2.items():
+    #     print(k, "\t", v)
 
 
     # pp1 = d.decrypt(key,c1)
