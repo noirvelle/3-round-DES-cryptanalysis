@@ -1,4 +1,5 @@
 #-*- coding: utf8 -*-
+from itertools import product
 
 #Initial permut matrix for the datas
 PI = [58, 50, 42, 34, 26, 18, 10, 2,
@@ -125,6 +126,9 @@ def xor_bits_array(arr1, arr2):
 def xor(arr1, arr2):
     return [p1 ^ p2 for (p1, p2) in zip(arr1, arr2)]
 
+def xor_string(str1, str2):
+    return xor(string_to_bit_array(str1), string_to_bit_array(str2))
+
 def bit_array_to_string(array): #Recreate the string from the bit array
     res = ''.join([chr(int(y,2)) for y in [''.join([str(x) for x in _bytes]) for _bytes in  nsplit(array,8)]])   
     return res
@@ -145,32 +149,6 @@ def divide_half(text):
 
 def bit_list_to_integer(bit_list):
     return int("".join(str(x) for x in bit_list), 2)
-
-def get_list_possible_sbox_input(sbox_index, expand_result, f_box_result):
-    output = bit_list_to_integer(f_box_result)
-    possible_input = []
-    for row in range(len(S_BOX[sbox_index])):
-        for column in range(len(S_BOX[sbox_index][row])):
-            if S_BOX[sbox_index][row][column] == output:
-                roww = [int(x) for x in list('{0:0b}'.format(row))]
-                coll = [int(x) for x in list('{0:0b}'.format(column))]
-
-                while len(roww) < 2:
-                    roww = [0] + roww
-                while len(coll) < 4:
-                    coll = [0] + coll
-
-                possible_input.append([roww[0], coll[0], coll[1], coll[2], coll[3], roww[1]])
-
-    return possible_input
-
-def right_shift(bit_list, n):
-    from collections import deque
-    bit_list_shifted = deque(bit_list)
-    bit_list_shifted.rotate(n)
-    return list(bit_list_shifted)
-
-
 ENCRYPT=1
 DECRYPT=0
 

@@ -1,4 +1,29 @@
+from itertools import product
 from des import *
+
+def get_list_possible_sbox_input(sbox_index, expand_result, f_box_result):
+    output = bit_list_to_integer(f_box_result)
+    possible_input = []
+    for row in range(len(S_BOX[sbox_index])):
+        for column in range(len(S_BOX[sbox_index][row])):
+            if S_BOX[sbox_index][row][column] == output:
+                roww = [int(x) for x in list('{0:0b}'.format(row))]
+                coll = [int(x) for x in list('{0:0b}'.format(column))]
+
+                while len(roww) < 2:
+                    roww = [0] + roww
+                while len(coll) < 4:
+                    coll = [0] + coll
+
+                possible_input.append([roww[0], coll[0], coll[1], coll[2], coll[3], roww[1]])
+
+    return possible_input
+
+def right_shift(bit_list, n):
+    from collections import deque
+    bit_list_shifted = deque(bit_list)
+    bit_list_shifted.rotate(n)
+    return list(bit_list_shifted)
 
 def get_possible_sbox_input(E_R, F_R_K):
     possible_k_list = []
@@ -14,57 +39,27 @@ def get_possible_sbox_input(E_R, F_R_K):
         possible_k_list.append([ xor(E_R[i], possible_input) for possible_input in possible_row_col ])
     return possible_k_list
 
-def get_possible_keys(des, ciphertext):
-
-    # L0: left half of plaintext, R0: right half of plaintext
-    L0, R0 = divide_half(des.text)
-    # L1: left half of ciphertext, R1: right half of ciphertext
-    R1, L1 = divide_half(ciphertext)
-
-    # expansion box input (E is Expansion table)
-    E_R0 = des.expand(string_to_bit_array(R0), E)
-    E_R0 = nsplit(E_R0, 6)
-
-    # FBox output
-    # R1 = L0 + F(R0, K1)
-    # F(R0, K1) = R1 + L0
-    F_R0_K1 = des.xor(string_to_bit_array(R1), string_to_bit_array(L0))
-    F_R0_K1 = nsplit(F_R0_K1, 4)
-
-    return get_possible_sbox_input(E_R0, F_R0_K1)
-
-def break_1_round_des():
-    pt1 = "PAPAMAMA"
-    pt2 = "HAHAHIHI"
-    pt3 = "ASDFGHJK"
-
-    sk = "secret_k"
-
-    d1 = des(round=1)
-    d2 = des(round=1)
-    d3 = des(round=1)
-
-    ct1 = d1.encrypt(key=sk, text=pt1)
-    ct2 = d2.encrypt(key=sk, text=pt2)
-    ct3 = d3.encrypt(key=sk, text=pt3)
-
-    possible_k_pt1 = get_possible_keys(d1, ct1)
-    possible_k_pt2 = get_possible_keys(d2, ct2)
-    possible_k_pt3 = get_possible_keys(d3, ct3)
-
+def get_intersect_key(possible_k_pt1, possible_k_pt2, possible_k_pt3):
     retrieved_key = []
-
-    from itertools import product
- 
     for s in range(8):
         for i,j,k in product(list(range(4)), list(range(4)), list(range(4))):
             if possible_k_pt1[s][i] == possible_k_pt2[s][j] == possible_k_pt3[s][k]:
                 retrieved_key += possible_k_pt1[s][i]
                 break
 
-    print(retrieved_key)
-    print(d1.keys[0])
+    return retrieved_key
+
+def get_intersect_key_diff(possible_k_pt1, possible_k_pt2, possible_k_pt3):
+    retrieved_key = {}
+    for s in range(8):
+        for i,j,k in product(list(range(4)), list(range(4)), list(range(4))):
+            if possible_k_pt1[s][i] == possible_k_pt2[s][j] or possible_k_pt2[s][j] == possible_k_pt3[s][k] or possible_k_pt1[s][i] == possible_k_pt3[s][k]:
+                retrieved_key[f"K{s}"] = possible_k_pt1[s][i]
+                break
+
+        # if len(retrieved_key) != (s+1) * 6:
+        #     retrieved_key += [-1] * 6
+
+    return retrieved_key
 
 
-if __name__ == '__main__':
-    break_1_round_des()
