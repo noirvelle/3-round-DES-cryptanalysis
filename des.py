@@ -117,6 +117,13 @@ def string_to_bit_array(text):#Convert a string into a list of bits
         array.extend([int(x) for x in list(binval)]) #Add the bits to the final list
     return array
 
+def string_to_bit_array_n(text, n):#Convert a string into a list of bits
+    array = list()
+    for char in text:
+        binval = binvalue(char, n)#Get the char value on one byte
+        array.extend([int(x) for x in list(binval)]) #Add the bits to the final list
+    return array
+
 def string_to_hex_bit_array(text):
     return {':'.join(hex(ord(x))[2:] for x in text)}
 
@@ -149,11 +156,17 @@ def divide_half(text):
 
 def bit_list_to_integer(bit_list):
     return int("".join(str(x) for x in bit_list), 2)
+
+def get_sbox_output(input, no_of_sbox):
+    row = bit_list_to_integer([input[0], input[5]])
+    col = bit_list_to_integer([input[1], input[2], input[3], input[4]])
+    return S_BOX[no_of_sbox][row][col]
+
 ENCRYPT=1
 DECRYPT=0
 
 class des():
-    def __init__(self, round=16):
+    def __init__(self, round=16, encrypt=False):
         self.password = None
         self.text = None
         self.keys = list()
