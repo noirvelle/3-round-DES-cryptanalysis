@@ -44,7 +44,7 @@ def get_possible_sbox_input(E_R, F_R_K):
         possible_subkeys_tested = []
 
         for possible_subkey in possible_subkeys:
-            if get_sbox_output(xor(possible_subkey, E_R[i]), i) == bit_list_to_integer(F_R_K[i]):
+            # if get_sbox_output(xor(possible_subkey, E_R[i]), i) == bit_list_to_integer(F_R_K[i]):
                 possible_subkeys_tested.append(possible_subkey)
 
         possible_subkey_list.append(possible_subkeys_tested)

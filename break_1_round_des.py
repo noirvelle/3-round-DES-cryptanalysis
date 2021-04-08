@@ -51,3 +51,6 @@ def break_1_round_des():
 
     print(f"""found K1: \t\t{K1}""")
     print(f"""actual K1: \t\t{d1.keys[0]}""")
+
+if __name__ == "__main__":
+    break_1_round_des()

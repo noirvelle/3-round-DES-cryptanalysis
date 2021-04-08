@@ -107,3 +107,6 @@ def break_2_round_des():
     print(f"""actual K2: \t\t{d1.keys[1]}""")
 
     assert K2  == d1.keys[1]
+
+if __name__ == "__main__":
+    break_2_round_des()
