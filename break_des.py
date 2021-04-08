@@ -51,18 +51,34 @@ def get_possible_sbox_input(E_R, F_R_K):
     return possible_subkey_list
 
 
-def get_possible_subkeys_from_sbox(sbox_input, sbox_output):
+def get_possible_subkeys_from_sbox(expansion_result, sbox_output, integer=False):
     possible_k_list = {}
-    for i in range(len(sbox_input)):
+    for i in range(len(expansion_result)):
         # getting possible row column value to construct S_Box input
         # getting row0,col0,col1,col2,col3,row1
         # there are four possible inputs SBOX
-        possible_row_col = get_possible_sbox_inputs(i, sbox_input[i], sbox_output[i])
+        possible_rows_cols = get_possible_sbox_inputs(i, expansion_result[i], sbox_output[i])
+
+        possible_subkeys = [ xor(expansion_result[i], possible_row_col) for possible_row_col in possible_rows_cols ]
+
+        # possible_subkeys_tested = []
+        possible_subkeys_tested = possible_subkeys
+
+        # for possible_subkey in possible_subkeys:
+        #     actual_s_box_output = get_sbox_output(xor(possible_subkey, expansion_result[i]), i)
+        #     if actual_s_box_output == sbox_output[i]:
+        #         possible_subkeys_tested.append(possible_subkey)
 
         # row0,col0,col1,col2,col3,row1 = E(R0) + K1
         # K1 = row0,col0,col1,col2,col3,row1 + E(R0)  
         # this possible key just contains of 6 bit of total 48 key bit
-        possible_k_list[f"K{i+1}"] = [ xor(sbox_input[i], possible_input) for possible_input in possible_row_col ]
+
+        # possible_k_list[f"K{i+1}"] = [ xor(sbox_input[i], possible_input) for possible_input in possible_row_col ]
+        if integer:
+            possible_k_list[f"K{i+1}"] = [convert_to_int(possible_subkey_tested) for possible_subkey_tested in possible_subkeys_tested]
+        else: 
+            possible_k_list[f"K{i+1}"] = possible_subkeys_tested
+
     return possible_k_list
 
 def convert_to_int(bit_list):
@@ -139,7 +155,7 @@ class PlaintextRandomGenerator:
     def generate(self, difference=None):
         # TODO validate difference
 
-        plaintext = ''.join(random.choice(string.ascii_uppercase) for _ in range(8))
+        plaintext = ''.join(random.choice(string.ascii_letters) for _ in range(8))
 
         if difference == None:
             return plaintext

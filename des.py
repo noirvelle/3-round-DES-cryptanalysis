@@ -160,7 +160,7 @@ def bit_list_to_integer(bit_list):
 def get_sbox_output(input, no_of_sbox):
     row = bit_list_to_integer([input[0], input[5]])
     col = bit_list_to_integer([input[1], input[2], input[3], input[4]])
-    return S_BOX[no_of_sbox][row][col]
+    return [int(x) for x in '{:04b}'.format(S_BOX[no_of_sbox][row][col])]
 
 ENCRYPT=1
 DECRYPT=0
@@ -207,6 +207,7 @@ class des():
                 # tmp = self.permut(tmp, P)                   # final of F-BOX -> F(Rn-1, Kn)
                 self.data[f"F{i}"] = tmp
                 tmp = self.xor(left, tmp)                     # Ln-1 XOR F(Rn-1, Kn)
+                self.data[f"F{i}_xored"] = tmp
                 left = right
                 right = tmp
                 self.data[f"R{i+1}"] = tmp
